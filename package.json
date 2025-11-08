@@ -14,7 +14,15 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint . --ext .ts,.tsx"
+    "lint": "eslint . --ext .ts,.tsx",
+    "package": "electron-builder --dir",
+    "dist": "electron-builder",
+    "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win",
+    "dist:linux": "electron-builder --linux",
+    "dist:all": "electron-builder --mac --win --linux",
+    "postinstall": "electron-builder install-app-deps",
+    "clean": "rm -rf dist out"
   },
   "dependencies": {
     "@mui/material": "^5.15.0",

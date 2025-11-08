@@ -5,6 +5,16 @@ node_modules/
 dist/
 dist-electron/
 out/
+*.dmg
+*.exe
+*.AppImage
+*.deb
+*.rpm
+*.snap
+
+# Build cache
+.electron-builder-cache/
+node_modules/.cache/
 
 # Logs
 *.log
@@ -21,6 +31,7 @@ yarn-error.log*
 # OS files
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # IDE files
 .vscode/

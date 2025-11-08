@@ -67,18 +67,349 @@ The course list features:
 - Progress indicators showing completion percentage
 - Course metadata including title, instructor, description, lesson count, and duration
 
-## Build
+## Building & Distribution
 
-Create a production build of the application:
+### Overview
+
+The app can be packaged for macOS, Windows, and Linux using electron-builder. Builds are unsigned by default, which means users will see security warnings on first launch.
+
+### Prerequisites
+
+- **Node.js**: Version 18.0.0 or higher
+- **npm**: Comes with Node.js
+- **Platform-specific tools**:
+  - macOS: Xcode Command Line Tools (for native modules)
+  - Windows: Visual Studio Build Tools or Windows SDK (for native modules)
+  - Linux: Standard build tools (gcc, make)
+
+### Development Build
+
+Run the application in development mode with hot reload:
+
+```bash
+npm run dev
+```
+
+Use this for testing during development. No build artifacts are created.
+
+### Production Build
+
+Compile TypeScript to JavaScript:
 
 ```bash
 npm run build
 ```
 
-This compiles:
-- Electron main process (Node.js)
-- Preload scripts (secure IPC bridge)
-- React renderer (frontend)
+This compiles the code into the `out/` directory. Required before running `package` or `dist` commands. This does NOT create an installer, only compiles the code.
+
+### Packaging (Testing)
+
+Package the app without creating an installer:
+
+```bash
+npm run package
+```
+
+**Output**: Unpacked app in `dist/[platform]/` directory
+
+**Use case**: Test the packaged app before creating an installer
+
+**How to test**:
+- macOS: Open `dist/mac/Course Player.app`
+- Windows: Run `dist/win-unpacked/Course Player.exe`
+- Linux: Run `dist/linux-unpacked/course-player`
+
+### Creating Installers
+
+#### Current Platform
+
+Create installer for your current platform:
+
+```bash
+npm run dist
+```
+
+**Output**:
+- macOS: `dist/Course Player-0.1.0.dmg`
+- Windows: `dist/Course Player Setup 0.1.0.exe`
+- Linux: `dist/Course-Player-0.1.0.AppImage`
+
+#### Specific Platform
+
+Build for a specific platform:
+
+```bash
+npm run dist:mac    # macOS DMG
+npm run dist:win    # Windows NSIS installer
+npm run dist:linux  # Linux AppImage
+```
+
+**Note**: Building for other platforms may require additional setup (Wine for Windows builds on macOS/Linux)
+
+#### All Platforms
+
+Create installers for all platforms:
+
+```bash
+npm run dist:all
+```
+
+**Requirements**: Best results on macOS (can build all platforms with Wine)
+
+**Output**: DMG, EXE, and AppImage in `dist/` directory
+
+### Build Workflow
+
+1. Make changes to code
+2. Test with `npm run dev`
+3. Compile with `npm run build`
+4. (Optional) Test packaged app with `npm run package`
+5. Create installer with `npm run dist`
+6. Test installer on target platform
+7. Distribute installer to users
+
+### Platform-Specific Notes
+
+#### macOS
+
+- **Installer format**: DMG (disk image)
+- **Architecture**: Universal binary (Intel x64 + Apple Silicon arm64)
+- **Minimum OS**: macOS 10.15 (Catalina) or newer
+- **Security warning**: "Course Player is from an unidentified developer"
+  - **Solution**: Right-click app > Open, or run `xattr -cr /Applications/Course\ Player.app`
+  - **Prevention**: Code signing with Apple Developer certificate (requires $99/year account)
+- **Installation**: Drag app to Applications folder from DMG
+- **Uninstallation**: Drag app from Applications to Trash
+
+#### Windows
+
+- **Installer format**: NSIS (Nullsoft Scriptable Install System)
+- **Architecture**: x64 (64-bit)
+- **Minimum OS**: Windows 10 or newer
+- **Security warning**: Windows SmartScreen "Windows protected your PC"
+  - **Solution**: Click "More info" > "Run anyway"
+  - **Prevention**: Code signing with certificate (requires $100-400/year certificate)
+- **Installation**: Run installer, choose install location, click Install
+- **Uninstallation**: Control Panel > Programs > Uninstall
+- **Shortcuts**: Desktop and Start Menu shortcuts created automatically
+
+#### Linux
+
+- **Installer format**: AppImage (portable, no installation required)
+- **Architecture**: x64 (64-bit)
+- **Minimum OS**: Most modern distributions (Ubuntu 20.04+, Fedora 35+, etc.)
+- **Security**: No warnings, AppImage is self-contained
+- **Making executable**: `chmod +x Course-Player-0.1.0.AppImage`
+- **Running**: `./Course-Player-0.1.0.AppImage` or double-click in file manager
+- **Installation**: Optional, can integrate with system using AppImageLauncher
+- **Uninstallation**: Delete AppImage file
+
+### File Sizes (Approximate)
+
+- macOS DMG: 150-200 MB (includes Electron runtime)
+- Windows EXE: 120-180 MB
+- Linux AppImage: 140-190 MB
+
+### Distribution
+
+#### Recommended Approach
+
+**1. GitHub Releases**:
+- Create a new release on GitHub
+- Upload installers as release assets
+- Users download directly from GitHub
+- Free and easy to set up
+- Supports auto-update in future
+
+**2. Direct Download**:
+- Host installers on personal website or CDN
+- Provide download links for each platform
+- Consider using a download page with platform detection
+
+**3. App Stores** (Future consideration):
+- Mac App Store (requires Apple Developer account, review process)
+- Microsoft Store (requires developer account, review process)
+- Snap Store / Flathub (Linux, free but requires packaging)
+
+### Code Signing (Optional)
+
+#### Why sign?
+
+- Removes security warnings on macOS and Windows
+- Required for auto-updates
+- Builds user trust
+- Required for app store distribution
+
+#### macOS Code Signing
+
+**Requirements**:
+- Apple Developer account ($99/year)
+- Developer ID Application certificate
+- Xcode or Xcode Command Line Tools
+
+**Process**:
+1. Obtain certificate from Apple Developer portal
+2. Install certificate in Keychain
+3. Add to `electron-builder.json`:
+   ```json
+   "mac": {
+     "identity": "Developer ID Application: Your Name (TEAM_ID)",
+     "hardenedRuntime": true,
+     "gatekeeperAssess": false,
+     "entitlements": "build/entitlements.mac.plist",
+     "entitlementsInherit": "build/entitlements.mac.plist"
+   }
+   ```
+4. Run `npm run dist:mac`
+
+**Notarization** (additional step):
+- Required for macOS 10.15+
+- Upload signed app to Apple for scanning
+- Staple notarization ticket to app
+- Add `afterSign` script to electron-builder.json
+
+#### Windows Code Signing
+
+**Requirements**:
+- Code signing certificate ($100-400/year from DigiCert, Sectigo, etc.)
+- Certificate file (.pfx or .p12) and password
+
+**Process**:
+1. Obtain certificate from certificate authority
+2. Add to `electron-builder.json`:
+   ```json
+   "win": {
+     "certificateFile": "path/to/certificate.pfx",
+     "certificatePassword": "password"
+   }
+   ```
+3. Or use environment variables:
+   - `CSC_LINK`: Path to certificate file
+   - `CSC_KEY_PASSWORD`: Certificate password
+4. Run `npm run dist:win`
+
+#### Linux Code Signing
+
+- Not required for Linux
+- AppImage is self-contained and portable
+- No security warnings by default
+
+### Auto-Updates (Optional, Future Enhancement)
+
+**Requirements**:
+- Update server (GitHub Releases, S3, custom server)
+- electron-updater package
+- Code signing (required for macOS/Windows)
+- Version management strategy
+
+**Implementation**:
+1. Install electron-updater: `npm install electron-updater`
+2. Configure publish in electron-builder.json:
+   ```json
+   "publish": {
+     "provider": "github",
+     "owner": "your-username",
+     "repo": "course-player"
+   }
+   ```
+3. Add update check in main process
+4. Handle update events (download, install, restart)
+5. Test update flow
+
+### Troubleshooting
+
+#### Build fails with "Cannot find module"
+
+**Solution**: Run `npm install` to ensure all dependencies are installed. Check that `out/` directory exists after `npm run build`. Verify `files` configuration in electron-builder.json includes `out/**/*`.
+
+#### App crashes on launch after packaging
+
+**Solution**: Check that `main` field in package.json points to `out/main/index.js`. Verify all required files are included in `files` configuration. Test with `npm run package` before creating installer. Check console logs for error messages.
+
+#### "Application is damaged" on macOS
+
+**Cause**: Gatekeeper blocking unsigned app
+
+**Solution**: Run `xattr -cr /Applications/Course\ Player.app` or right-click app > Open (first time only)
+
+**Prevention**: Code signing
+
+#### Windows SmartScreen warning
+
+**Cause**: Unsigned executable
+
+**Solution**: Click "More info" > "Run anyway"
+
+**Prevention**: Code signing
+
+#### Linux AppImage won't run
+
+**Cause**: Not marked as executable
+
+**Solution**: `chmod +x Course-Player-*.AppImage` or right-click > Properties > Permissions > Allow executing file as program
+
+#### Build is very slow
+
+**Solution**: Use `npm run dist` instead of `npm run dist:all` (build for current platform only). Disable compression: Set `"compression": "store"` in electron-builder.json. Use faster machine or CI/CD service.
+
+#### "ENOSPC: no space left on device"
+
+**Cause**: Insufficient disk space
+
+**Solution**: Free up disk space (builds require 1-2 GB temporary space). Clean build artifacts: `npm run clean`.
+
+#### Cross-platform builds fail
+
+**Cause**: Missing Wine (for Windows builds on macOS/Linux)
+
+**Solution**: Install Wine: `brew install wine-stable` (macOS) or `apt install wine` (Linux). Or build on target platform using CI/CD.
+
+### CI/CD Integration (Optional, Future Enhancement)
+
+#### GitHub Actions
+
+Create `.github/workflows/build.yml` for automated builds:
+
+```yaml
+name: Build
+on:
+  push:
+    tags:
+      - 'v*'
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - run: npm install
+      - run: npm run build
+      - run: npm run dist
+      - uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.os }}
+          path: dist/*
+```
+
+### Resources
+
+- electron-builder documentation: https://www.electron.build/
+- Electron documentation: https://www.electronjs.org/docs/latest/
+- Code signing guide: https://www.electron.build/code-signing
+- Auto-update guide: https://www.electron.build/auto-update
+
+### Notes
+
+- First build may take longer (downloads Electron binaries)
+- Subsequent builds are faster (uses cache)
+- Building for all platforms from one machine requires macOS
+- Consider using CI/CD for automated builds on multiple platforms
+- Test installers on target platforms before public release
 
 ## Type Checking
 
