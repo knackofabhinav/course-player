@@ -11,7 +11,7 @@ import {
   clearError,
   selectCourse
 } from '@/store/slices/coursesSlice'
-import { loadProgress, initializeCourseProgressFromCourse } from '@/store/slices/progressSlice'
+import { initializeCourseProgressFromCourse } from '@/store/slices/progressSlice'
 import { selectShowContinueWatching } from '@/store/slices/settingsSlice'
 import { selectCourseFolder } from '@/services/fileSystem'
 import { CourseList, CourseSearch, ContinueWatching } from '@/components/CourseList'
@@ -30,11 +30,6 @@ export default function CoursesPage() {
   const [snackbarOpen, setSnackbarOpen] = useState(false)
   const [snackbarMessage, setSnackbarMessage] = useState('')
   const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success')
-
-  // Load progress on mount
-  useEffect(() => {
-    dispatch(loadProgress())
-  }, [dispatch])
 
   // Handle adding a new course
   const handleAddCourse = async () => {

@@ -11,6 +11,7 @@ import MainLayout from '@/components/Layout/MainLayout'
 import { CoursesPage, CourseViewerPage, SettingsPage, NotFoundPage } from '@/pages'
 import { useAppDispatch, useAppSelector } from '@/store/hooks'
 import { loadSettingsFromStorage, selectTheme, setTheme, saveSettingsToStorage } from '@/store/slices/settingsSlice'
+import { loadProgress } from '@/store/slices/progressSlice'
 import { createNetflixTheme } from '@/theme'
 
 // Create context for color mode toggle
@@ -23,9 +24,10 @@ function App() {
   const themeFromSettings = useAppSelector(selectTheme)
   const [mode, setMode] = useState<PaletteMode>(themeFromSettings === 'system' ? 'dark' : themeFromSettings)
 
-  // Load settings on mount
+  // Load settings and progress on mount
   useEffect(() => {
     dispatch(loadSettingsFromStorage())
+    dispatch(loadProgress())
   }, [dispatch])
 
   // Sync theme with Redux

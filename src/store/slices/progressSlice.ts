@@ -52,6 +52,71 @@ export const saveProgress = createAsyncThunk(
   }
 )
 
+export const exportProgress = createAsyncThunk(
+  'progress/exportProgress',
+  async (_, { getState, rejectWithValue }) => {
+    try {
+      const state = getState() as RootState
+      const { courses, version } = state.progress
+
+      // Open save dialog
+      const result = await window.electron.exportProgress()
+
+      if (result.canceled) {
+        return { canceled: true }
+      }
+
+      if (!result.success || !result.filePath) {
+        return rejectWithValue(result.error || 'Failed to open save dialog')
+      }
+
+      // Write progress data to file
+      const progressData = { courses, version }
+      const writeResult = await window.electron.writeFile(
+        result.filePath,
+        JSON.stringify(progressData, null, 2)
+      )
+
+      if (!writeResult.success) {
+        return rejectWithValue(writeResult.error || 'Failed to write export file')
+      }
+
+      return { success: true, filePath: result.filePath }
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to export progress')
+    }
+  }
+)
+
+export const importProgress = createAsyncThunk(
+  'progress/importProgress',
+  async (_, { getState, rejectWithValue }) => {
+    try {
+      const state = getState() as RootState
+      const existingProgress = { courses: state.progress.courses, version: state.progress.version }
+
+      // Open import dialog and read file
+      const result = await window.electron.importProgress()
+
+      if (result.canceled) {
+        return { canceled: true }
+      }
+
+      if (!result.success || !result.data) {
+        return rejectWithValue(result.error || 'Failed to import progress')
+      }
+
+      // Import with mergeProgressData from progressManager
+      const { mergeProgressData } = await import('@/renderer/services/progressManager')
+      const mergedProgress = mergeProgressData(existingProgress, result.data)
+
+      return mergedProgress
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to import progress')
+    }
+  }
+)
+
 // Slice definition
 const progressSlice = createSlice({
   name: 'progress',
@@ -196,6 +261,34 @@ const progressSlice = createSlice({
 
     clearDirty: (state) => {
       state.isDirty = false
+    },
+
+    initializeCourseProgressFromCourse: (
+      state,
+      action: PayloadAction<{ id: string; sections: Array<{ lessons: Array<{ id: string }> }> }>
+    ) => {
+      const { id: courseId, sections } = action.payload
+
+      // Count total lessons
+      const totalLessons = sections.reduce(
+        (total, section) => total + section.lessons.length,
+        0
+      )
+
+      // Initialize course progress if it doesn't exist
+      if (!state.courses[courseId]) {
+        state.courses[courseId] = {
+          lastWatched: new Date().toISOString(),
+          currentLesson: '',
+          currentTime: 0,
+          lessons: {},
+          totalLessons,
+          completedLessons: 0
+        }
+      } else {
+        // Update total lessons count for existing course
+        state.courses[courseId].totalLessons = totalLessons
+      }
     }
   },
 
@@ -236,6 +329,43 @@ const progressSlice = createSlice({
         state.isSaving = false
         state.error = action.payload as string
         // Keep isDirty true to retry
+      })
+
+    // exportProgress
+    builder
+      .addCase(exportProgress.pending, (state) => {
+        state.isLoading = true
+        state.error = null
+      })
+      .addCase(exportProgress.fulfilled, (state) => {
+        state.isLoading = false
+      })
+      .addCase(exportProgress.rejected, (state, action) => {
+        state.isLoading = false
+        state.error = action.payload as string
+      })
+
+    // importProgress
+    builder
+      .addCase(importProgress.pending, (state) => {
+        state.isLoading = true
+        state.error = null
+      })
+      .addCase(importProgress.fulfilled, (state, action) => {
+        state.isLoading = false
+        if (action.payload && 'courses' in action.payload) {
+          // Merge imported progress
+          state.courses = { ...state.courses, ...action.payload.courses }
+          if (action.payload.version) {
+            state.version = action.payload.version
+          }
+          state.isDirty = true
+          state.lastSync = new Date().toISOString()
+        }
+      })
+      .addCase(importProgress.rejected, (state, action) => {
+        state.isLoading = false
+        state.error = action.payload as string
       })
   }
 })
@@ -337,6 +467,7 @@ export const {
   markLessonComplete,
   markLessonIncomplete,
   initializeCourseProgress,
+  initializeCourseProgressFromCourse,
   clearCourseProgress,
   markDirty,
   clearDirty

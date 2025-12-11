@@ -315,6 +315,87 @@ app.on('ready', () => {
       return { success: false, error: error.message || 'Failed to open external link' }
     }
   })
+
+  // IPC Handler: export-progress
+  ipcMain.handle('export-progress', async () => {
+    try {
+      if (!mainWindow) {
+        console.error('Main window not available')
+        return { success: false, error: 'Main window not available' }
+      }
+
+      console.log('Opening save dialog for progress export...')
+      const result = await dialog.showSaveDialog(mainWindow, {
+        title: 'Export Progress Data',
+        defaultPath: `course-player-progress-${new Date().toISOString().split('T')[0]}.json`,
+        filters: [
+          { name: 'JSON Files', extensions: ['json'] },
+          { name: 'All Files', extensions: ['*'] }
+        ]
+      })
+
+      if (result.canceled || !result.filePath) {
+        return { success: false, canceled: true }
+      }
+
+      return { success: true, filePath: result.filePath }
+    } catch (error: any) {
+      console.error('Error in export-progress:', error)
+      return { success: false, error: error.message || 'Failed to open save dialog' }
+    }
+  })
+
+  // IPC Handler: import-progress
+  ipcMain.handle('import-progress', async () => {
+    try {
+      if (!mainWindow) {
+        console.error('Main window not available')
+        return { success: false, error: 'Main window not available' }
+      }
+
+      console.log('Opening file dialog for progress import...')
+      const result = await dialog.showOpenDialog(mainWindow, {
+        title: 'Import Progress Data',
+        properties: ['openFile'],
+        filters: [
+          { name: 'JSON Files', extensions: ['json'] },
+          { name: 'All Files', extensions: ['*'] }
+        ]
+      })
+
+      if (result.canceled || result.filePaths.length === 0) {
+        return { success: false, canceled: true }
+      }
+
+      const filePath = result.filePaths[0]
+      const fileContents = await fs.readFile(filePath, 'utf-8')
+      const progressData = JSON.parse(fileContents)
+
+      // Basic validation
+      if (!progressData.courses || typeof progressData.courses !== 'object') {
+        return { success: false, error: 'Invalid progress data format' }
+      }
+
+      return { success: true, data: progressData }
+    } catch (error: any) {
+      console.error('Error in import-progress:', error)
+      if (error instanceof SyntaxError) {
+        return { success: false, error: 'Invalid JSON format in file' }
+      }
+      return { success: false, error: error.message || 'Failed to import progress' }
+    }
+  })
+
+  // IPC Handler: write-file
+  ipcMain.handle('write-file', async (_event, filePath: string, content: string) => {
+    try {
+      await fs.writeFile(filePath, content, 'utf-8')
+      return { success: true }
+    } catch (error: any) {
+      console.error('Error in write-file:', error)
+      return { success: false, error: error.message || 'Failed to write file' }
+    }
+  })
 })
 
 app.on('window-all-closed', () => {
