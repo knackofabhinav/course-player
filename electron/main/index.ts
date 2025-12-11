@@ -317,7 +317,7 @@ app.on('ready', () => {
   })
 
   // IPC Handler: export-progress
-  ipcMain.handle('export-progress', async () => {
+  ipcMain.handle('export-progress', async (_event, progressData: any) => {
     try {
       if (!mainWindow) {
         console.error('Main window not available')
@@ -335,13 +335,16 @@ app.on('ready', () => {
       })
 
       if (result.canceled || !result.filePath) {
-        return { success: false, canceled: true }
+        return { canceled: true }
       }
+
+      // Write progress data to file in main process
+      await fs.writeFile(result.filePath, JSON.stringify(progressData, null, 2), 'utf-8')
 
       return { success: true, filePath: result.filePath }
     } catch (error: any) {
       console.error('Error in export-progress:', error)
-      return { success: false, error: error.message || 'Failed to open save dialog' }
+      return { success: false, error: error.message || 'Failed to export progress' }
     }
   })
 
@@ -364,15 +367,15 @@ app.on('ready', () => {
       })
 
       if (result.canceled || result.filePaths.length === 0) {
-        return { success: false, canceled: true }
+        return { canceled: true }
       }
 
       const filePath = result.filePaths[0]
       const fileContents = await fs.readFile(filePath, 'utf-8')
       const progressData = JSON.parse(fileContents)
 
-      // Basic validation
-      if (!progressData.courses || typeof progressData.courses !== 'object') {
+      // Comprehensive validation
+      if (!validateProgressData(progressData)) {
         return { success: false, error: 'Invalid progress data format' }
       }
 
@@ -385,18 +388,73 @@ app.on('ready', () => {
       return { success: false, error: error.message || 'Failed to import progress' }
     }
   })
-
-  // IPC Handler: write-file
-  ipcMain.handle('write-file', async (_event, filePath: string, content: string) => {
-    try {
-      await fs.writeFile(filePath, content, 'utf-8')
-      return { success: true }
-    } catch (error: any) {
-      console.error('Error in write-file:', error)
-      return { success: false, error: error.message || 'Failed to write file' }
-    }
-  })
 })
+
+/**
+ * Validate progress data structure
+ * @param data Data to validate
+ * @returns True if data is valid ProgressData
+ */
+function validateProgressData(data: any): boolean {
+  // Check if data is object and not null
+  if (!data || typeof data !== 'object') {
+    return false
+  }
+
+  // Check if courses property exists and is object
+  if (!data.courses || typeof data.courses !== 'object') {
+    return false
+  }
+
+  // Validate each course progress structure
+  for (const courseId in data.courses) {
+    const courseProgress = data.courses[courseId]
+
+    // Check required fields
+    if (typeof courseProgress !== 'object') {
+      return false
+    }
+
+    // Validate optional fields if they exist
+    if (courseProgress.lessons && typeof courseProgress.lessons !== 'object') {
+      return false
+    }
+
+    if (courseProgress.totalLessons !== undefined && typeof courseProgress.totalLessons !== 'number') {
+      return false
+    }
+
+    if (courseProgress.completedLessons !== undefined && typeof courseProgress.completedLessons !== 'number') {
+      return false
+    }
+
+    // Validate lesson progress if lessons exist
+    if (courseProgress.lessons) {
+      for (const lessonId in courseProgress.lessons) {
+        const lessonProgress = courseProgress.lessons[lessonId]
+
+        if (typeof lessonProgress !== 'object') {
+          return false
+        }
+
+        // Validate lesson progress fields
+        if (lessonProgress.completed !== undefined && typeof lessonProgress.completed !== 'boolean') {
+          return false
+        }
+
+        if (lessonProgress.watchedDuration !== undefined && typeof lessonProgress.watchedDuration !== 'number') {
+          return false
+        }
+
+        if (lessonProgress.lastPosition !== undefined && typeof lessonProgress.lastPosition !== 'number') {
+          return false
+        }
+      }
+    }
+  }
+
+  return true
+}
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {

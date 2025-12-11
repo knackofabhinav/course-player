@@ -46,14 +46,11 @@ interface ElectronAPI {
   // Open external link in default browser
   openExternalLink: (url: string) => Promise<{ success: boolean; error?: string }>
 
-  // Export progress data - opens save dialog
-  exportProgress: () => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>
+  // Export progress data - opens save dialog and writes file
+  exportProgress: (progressData: ProgressData) => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>
 
   // Import progress data - opens file dialog and returns data
   importProgress: () => Promise<{ success: boolean; data?: ProgressData; canceled?: boolean; error?: string }>
-
-  // Write file to disk
-  writeFile: (filePath: string, content: string) => Promise<{ success: boolean; error?: string }>
 }
 
 // Augment the global Window interface

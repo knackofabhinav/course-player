@@ -21,6 +21,10 @@ const initialState: ProgressState = {
 }
 
 // Async thunks
+/**
+ * Load progress data from local storage
+ * Uses fallback mechanism to handle corrupted data
+ */
 export const loadProgress = createAsyncThunk(
   'progress/loadProgress',
   async (_, { rejectWithValue }) => {
@@ -33,6 +37,10 @@ export const loadProgress = createAsyncThunk(
   }
 )
 
+/**
+ * Save progress data to local storage
+ * Only saves if there are pending changes (isDirty flag is true)
+ */
 export const saveProgress = createAsyncThunk(
   'progress/saveProgress',
   async (_, { getState, rejectWithValue }) => {
@@ -52,6 +60,10 @@ export const saveProgress = createAsyncThunk(
   }
 )
 
+/**
+ * Export progress data to a JSON file
+ * Opens a save dialog and writes the progress data to the selected file
+ */
 export const exportProgress = createAsyncThunk(
   'progress/exportProgress',
   async (_, { getState, rejectWithValue }) => {
@@ -59,26 +71,15 @@ export const exportProgress = createAsyncThunk(
       const state = getState() as RootState
       const { courses, version } = state.progress
 
-      // Open save dialog
-      const result = await window.electron.exportProgress()
+      const progressData = { courses, version }
+      const result = await window.electron.exportProgress(progressData)
 
       if (result.canceled) {
-        return { canceled: true }
+        return rejectWithValue('canceled')
       }
 
       if (!result.success || !result.filePath) {
-        return rejectWithValue(result.error || 'Failed to open save dialog')
-      }
-
-      // Write progress data to file
-      const progressData = { courses, version }
-      const writeResult = await window.electron.writeFile(
-        result.filePath,
-        JSON.stringify(progressData, null, 2)
-      )
-
-      if (!writeResult.success) {
-        return rejectWithValue(writeResult.error || 'Failed to write export file')
+        return rejectWithValue(result.error || 'Failed to export progress')
       }
 
       return { success: true, filePath: result.filePath }
@@ -88,6 +89,10 @@ export const exportProgress = createAsyncThunk(
   }
 )
 
+/**
+ * Import progress data from a JSON file
+ * Opens a file dialog, reads and validates the data, then merges it with existing progress
+ */
 export const importProgress = createAsyncThunk(
   'progress/importProgress',
   async (_, { getState, rejectWithValue }) => {
@@ -99,7 +104,7 @@ export const importProgress = createAsyncThunk(
       const result = await window.electron.importProgress()
 
       if (result.canceled) {
-        return { canceled: true }
+        return rejectWithValue('canceled')
       }
 
       if (!result.success || !result.data) {

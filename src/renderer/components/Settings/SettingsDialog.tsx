@@ -144,9 +144,12 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
         setSnackbarOpen(true)
       }
     } catch (error: any) {
-      setSnackbarMessage(error || 'Failed to export progress')
-      setSnackbarSeverity('error')
-      setSnackbarOpen(true)
+      // Don't show error for canceled operations
+      if (error !== 'canceled') {
+        setSnackbarMessage(error || 'Failed to export progress')
+        setSnackbarSeverity('error')
+        setSnackbarOpen(true)
+      }
     }
   }
 
@@ -154,13 +157,14 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
     try {
       const result = await dispatch(importProgress()).unwrap()
       if (result && 'courses' in result) {
-        // Save imported progress
-        await dispatch(saveProgress())
+        // Mark progress as dirty so it will be saved
+        // No need to call saveProgress explicitly - auto-save will handle it
         setSnackbarMessage('Progress imported and merged successfully!')
         setSnackbarSeverity('success')
         setSnackbarOpen(true)
       }
     } catch (error: any) {
+      // Don't show error for canceled operations
       if (error !== 'canceled') {
         setSnackbarMessage(error || 'Failed to import progress')
         setSnackbarSeverity('error')
