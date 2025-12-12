@@ -165,6 +165,30 @@ export function validateProgressData(data: any): data is ProgressData {
     if (courseProgress.completedLessons !== undefined && typeof courseProgress.completedLessons !== 'number') {
       return false
     }
+
+    // Validate lesson progress if lessons exist
+    if (courseProgress.lessons) {
+      for (const lessonId in courseProgress.lessons) {
+        const lessonProgress = courseProgress.lessons[lessonId]
+
+        if (typeof lessonProgress !== 'object') {
+          return false
+        }
+
+        // Validate lesson progress fields
+        if (lessonProgress.completed !== undefined && typeof lessonProgress.completed !== 'boolean') {
+          return false
+        }
+
+        if (lessonProgress.watchedDuration !== undefined && typeof lessonProgress.watchedDuration !== 'number') {
+          return false
+        }
+
+        if (lessonProgress.lastPosition !== undefined && typeof lessonProgress.lastPosition !== 'number') {
+          return false
+        }
+      }
+    }
   }
 
   return true

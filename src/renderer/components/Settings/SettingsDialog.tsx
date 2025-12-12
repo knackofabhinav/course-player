@@ -28,9 +28,10 @@ import {
   IconButton,
   Alert,
   InputLabel,
+  Snackbar,
   alpha
 } from '@mui/material'
-import { Close, Delete, Restore, FolderOpen } from '@mui/icons-material'
+import { Close, Delete, Restore, FolderOpen, CloudUpload, CloudDownload } from '@mui/icons-material'
 import { useAppDispatch, useAppSelector } from '@/store/hooks'
 import {
   loadSettingsFromStorage,
@@ -47,6 +48,11 @@ import {
   selectCourseFolders,
   selectKeyboardShortcuts
 } from '@/store/slices/settingsSlice'
+import {
+  exportProgress,
+  importProgress,
+  saveProgress
+} from '@/store/slices/progressSlice'
 import { selectCourseFolder } from '@/services/fileSystem'
 import type { AppSettings } from '@/types'
 
@@ -85,6 +91,9 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
 
   const [activeTab, setActiveTab] = useState(0)
   const [tempSettings, setTempSettings] = useState<Partial<AppSettings>>({})
+  const [snackbarOpen, setSnackbarOpen] = useState(false)
+  const [snackbarMessage, setSnackbarMessage] = useState('')
+  const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error' | 'info'>('success')
 
   useEffect(() => {
     if (open) {
@@ -124,6 +133,48 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
 
   const handleRemoveCourseFolder = (folderPath: string) => {
     dispatch(removeCourseFolder(folderPath))
+  }
+
+  const handleExportProgress = async () => {
+    try {
+      const result = await dispatch(exportProgress()).unwrap()
+      if (result && 'success' in result && result.success) {
+        setSnackbarMessage('Progress exported successfully!')
+        setSnackbarSeverity('success')
+        setSnackbarOpen(true)
+      }
+    } catch (error: any) {
+      // Don't show error for canceled operations
+      if (error !== 'canceled') {
+        setSnackbarMessage(error || 'Failed to export progress')
+        setSnackbarSeverity('error')
+        setSnackbarOpen(true)
+      }
+    }
+  }
+
+  const handleImportProgress = async () => {
+    try {
+      const result = await dispatch(importProgress()).unwrap()
+      if (result && 'courses' in result) {
+        // Mark progress as dirty so it will be saved
+        // No need to call saveProgress explicitly - auto-save will handle it
+        setSnackbarMessage('Progress imported and merged successfully!')
+        setSnackbarSeverity('success')
+        setSnackbarOpen(true)
+      }
+    } catch (error: any) {
+      // Don't show error for canceled operations
+      if (error !== 'canceled') {
+        setSnackbarMessage(error || 'Failed to import progress')
+        setSnackbarSeverity('error')
+        setSnackbarOpen(true)
+      }
+    }
+  }
+
+  const handleSnackbarClose = () => {
+    setSnackbarOpen(false)
   }
 
   return (
@@ -194,6 +245,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
         <Tab label="General" />
         <Tab label="Playback" />
         <Tab label="Appearance" />
+        <Tab label="Data" />
         <Tab label="Keyboard Shortcuts" />
       </Tabs>
 
@@ -337,8 +389,48 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
           )}
         </TabPanel>
 
-        {/* Tab Panel 3: Keyboard Shortcuts */}
+        {/* Tab Panel 3: Data Management */}
         <TabPanel value={activeTab} index={3}>
+          <Typography variant="h6" gutterBottom>
+            Progress Data Management
+          </Typography>
+          <Typography variant="body2" color="text.secondary" gutterBottom>
+            Export and import your course progress data
+          </Typography>
+
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 3 }}>
+            <Button
+              variant="outlined"
+              startIcon={<CloudDownload />}
+              onClick={handleExportProgress}
+              fullWidth
+            >
+              Export Progress Data
+            </Button>
+            <Typography variant="caption" color="text.secondary" sx={{ mt: -1 }}>
+              Save your progress to a JSON file for backup or transfer to another device
+            </Typography>
+
+            <Button
+              variant="outlined"
+              startIcon={<CloudUpload />}
+              onClick={handleImportProgress}
+              fullWidth
+            >
+              Import Progress Data
+            </Button>
+            <Typography variant="caption" color="text.secondary" sx={{ mt: -1 }}>
+              Load progress from a backup file. Your existing progress will be merged with the imported data
+            </Typography>
+          </Box>
+
+          <Alert severity="info" sx={{ mt: 3 }}>
+            Progress data is automatically saved to <code>~/.course-player/progress.json</code>
+          </Alert>
+        </TabPanel>
+
+        {/* Tab Panel 4: Keyboard Shortcuts */}
+        <TabPanel value={activeTab} index={4}>
           <Typography variant="h6" gutterBottom>
             Keyboard Shortcuts
           </Typography>
@@ -374,6 +466,18 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
           Save
         </Button>
       </DialogActions>
+
+      {/* Snackbar for import/export notifications */}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={4000}
+        onClose={handleSnackbarClose}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={handleSnackbarClose} severity={snackbarSeverity} sx={{ width: '100%' }}>
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
     </Dialog>
   )
 }

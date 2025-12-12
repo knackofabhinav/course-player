@@ -19,5 +19,7 @@ contextBridge.exposeInMainWorld('electron', {
   readVideoFile: (filePath: string) => ipcRenderer.invoke('read-video-file', filePath),
   readImageFile: (filePath: string) => ipcRenderer.invoke('read-image-file', filePath),
   openResource: (filePath: string) => ipcRenderer.invoke('open-resource', filePath),
-  openExternalLink: (url: string) => ipcRenderer.invoke('open-external-link', url)
+  openExternalLink: (url: string) => ipcRenderer.invoke('open-external-link', url),
+  exportProgress: (progressData: any) => ipcRenderer.invoke('export-progress', progressData),
+  importProgress: () => ipcRenderer.invoke('import-progress')
 })
